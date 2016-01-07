@@ -1,10 +1,11 @@
 class SendmailParser
   def initialize(conf)
-    @base_regexp   = /^(?<time>\w{3} \d+ \d+:\d+:\d+) (?<host>[^ ]+) (?<procowner>[^\[]+)\[(?<procid>\d+)\]: (?<mid>[^ ]+): (?<entry>(?<type>[^=]+).+)$/
+    @base_regexp = /^(?<time>\w+\s+\w+\s+\d+:\d+:\d+) (?<host>[^ ]+) (?<procowner>[^\[]+)\[(?<procid>\d+)\]: (?<qid>[^ ]+): (?<entry>(?<type>[^=]+).+)$/;
   end
 
   def to_parser(entry)
-    unless entry.include?("stat=Sent")
+    # An email will be queued if it is not sent or bounced.
+    if not entry.include?("stat=Sent") and not entry.include?("dsn=5.")
       return :queued, nil
     end
     record = {}
@@ -52,12 +53,14 @@ class SendmailParser
     m = @base_regexp.match(value)
     unless m
       # $log.warn "sendmail: pattern not match: #{value.inspect}"
-      return nil, nil, nil, nil
+      return nil, nil, nil, nil, nil
     end
 
     type = nil
+    # $log.info("milter!!!!", m["milter"])
     logtype = m["type"]
     entry = m["entry"]
+    mta = m["host"]
 
     case logtype
     when "from"
@@ -65,16 +68,16 @@ class SendmailParser
     when "to"
       type, record = to_parser(entry)
       if type == :queued
-        return nil, nil, nil, nil
+        return nil, nil, nil, nil, nil
       end
     else
       # not match
-      return nil, nil, nil, nil
+      return nil, nil, nil, nil, nil
     end
 
-    mid = m["mid"]
-    time = Time.parse(m["time"]) || Fluent::Engine.now
+    qid = m["qid"]
+    time = Time.parse(m["time"]).to_i || Fluent::Engine.now.to_i
 
-    return mid, type, time, record
+    return mta, qid, type, time, record
   end
 end

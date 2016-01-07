@@ -1,14 +1,17 @@
 class Fluent::SendmailInput < Fluent::TailInput
+  config_param :lrucache_size, :integer, :default => (1024*1024)
+  
   Fluent::Plugin.register_input('sendmail', self)
 
   require_relative 'sendmailparser'
   require 'pathname'
+  require 'lru_redux'
 
   config_param :types, :string, :default => 'from,sent'
 
   def initialize
     super
-    @transactions = {}
+    @transactions = LruRedux::ThreadSafeCache.new(@lrucache_size)
   end
 
   def configure_parser(conf)
@@ -20,20 +23,23 @@ class Fluent::SendmailInput < Fluent::TailInput
     lines.each {|line|
       begin
         line.chomp!  # remove \n
-        mid, type, time, record = parse_line(line)
+        mta, qid, type, time, record = parse_line(line)
 
-        if mid && type && time && record
-          if @transactions.has_key?(mid)
-            @transactions[mid].merge(type, time, record)
-          elsif mid && type == :from && time && record
-            @transactions[mid] = SendmailLog.new(time, record)
-          end
-
-          if @transactions[mid].status == :ready
-            log = @transactions[mid]
-            es.add(log.time, log.record)
-            @transactions.delete(mid)
-            log.destroy
+        if mta && qid && type && time && record
+          # make recordid uniq even if multiple MTA's log are mixed. 
+          recordid = mta + qid
+          if @transactions.has_key?(recordid)
+            @transactions[recordid].merge(type, time, record)
+            if @transactions[recordid].status == :ready
+              log = @transactions[recordid]
+              es.add(log.time, log.record)
+              @transactions.delete(qid)
+              # log.destroy
+            end
+          # new log
+          elsif mta && qid && type == :from && time && record
+            recordid = mta + qid
+            @transactions[recordid] = SendmailLog.new(mta, time, record)
           end
         end
       rescue
@@ -55,7 +61,8 @@ end
 class SendmailLog
   attr_reader :status
   attr_reader :time
-  def initialize(time, record)
+  def initialize(mta, time, record)
+    @mta = mta
     @status = :init
     @time = time
     @tos  = {}
@@ -65,16 +72,22 @@ class SendmailLog
 
   def record
     return {
+      "mta" => @mta,
       "from" => @from["from"],
       "relay" => @from["relay"],
       "count" => @from["nrcpts"],
+      "size" => @from["size"],
       "msgid" => @from["msgid"],
       "popid" => @from["popid"],
       "authid" => @from["authid"],
       "to" => @tos.map {|name, to|
         {
           "to" => to["to"],
-          "relay" => to["relay"]
+          "relay" => to["relay"],
+          "stat" => to["stat"],
+          "dsn" => to["dsn"],
+          "delay" => to["delay"],
+          "xdelay" => to["xdelay"]
         }
       }
     }
