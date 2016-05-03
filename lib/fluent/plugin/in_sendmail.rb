@@ -60,7 +60,7 @@ class Fluent::SendmailInput < Fluent::TailInput
             to = noncommon
             status = to.status
             case status
-            when :sent, :bounced
+            when :sent, :sent_local, :bounced
               @delivers[deliveryid].dequeued(time, record)
               if @do_unbundle
                 log_single(es, deliveryid, time, record)
@@ -131,48 +131,23 @@ class SendmailLog
   def record
     return {
       "mta" => @mta,
-      "from" => @from["from"],
-      "relay" => @from["relay"],
-      "count" => @from["nrcpts"],
-      "size" => @from["size"],
-      "msgid" => @from["msgid"],
-      "popid" => @from["popid"],
-      "authid" => @from["authid"],
-      "to" => @tos.each {|to|
-        {
-          "to" => to["to"],
-          "relay" => to["relay"],
-          "stat" => to["stat"],
-          "dsn" => to["dsn"],
-          "delay" => to["delay"],
-          "xdelay" => to["xdelay"]
-        }
-      }
+      "from" => @from,
+      "to" => @tos
     }
   end
 
   def record_unbundle(time, record)
-    tos_flatten = []
+    records_unbundled = []
     for to in record["to"] do
-      tos_flatten.push(
-                       {
-                         "mta" => @mta,
-                         "from" => @from["from"],
-                         "relay" => @from["relay"],
-                         "count" => @from["nrcpts"],
-                         "size" => @from["size"],
-                         "msgid" => @from["msgid"],
-                         "popid" => @from["popid"],
-                         "authid" => @from["authid"],
-                         "to" => to,
-                         "relay" => record["relay"],
-                         "stat" => record["stat"],
-                         "dsn" => record["dsn"],
-                         "delay" => record["delay"],
-                         "xdelay" => record["xdelay"]
-                       })
+      record_single = record.dup
+      record_single["to"] = to
+      records_unbundled.push({
+        "mta" => @mta,
+        "from" => @from,
+        "to" => record_single
+      })
     end
-    return tos_flatten
+    return records_unbundled
   end
 
   def dequeued(time, record)

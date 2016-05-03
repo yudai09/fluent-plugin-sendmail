@@ -100,7 +100,11 @@ class SendmailParser
 
   def status_parser(entry)
     if entry.include?("stat=Sent")
-      return :sent
+      if entry.include?("mailer=local,")
+        return :sent_local
+      else
+        return :sent
+      end
     elsif entry.include?("dsn=5.")
       return :bounced
     elsif entry.include?("stat=Deferred")
@@ -124,5 +128,6 @@ class ToLine
   def initialize(status, record)
     @status = status
     @record = record
+    @record["canonical_status"] = status.to_s
   end
 end
