@@ -83,7 +83,6 @@ class Fluent::SendmailInput < Fluent::TailInput
             end
           else
             # cannot find any 'from' line corresponded to the 'to' line
-            pass
           end
         end
       rescue
