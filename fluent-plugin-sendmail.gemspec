@@ -4,7 +4,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name          = "fluent-plugin-sendmail"
-  spec.version       = "0.0.0"
+  spec.version       = "0.1.0"
   spec.authors       = ["muddydixon"]
   spec.email         = ["muddydixon@gmail.com"]
   spec.summary       = "Fluentd plugin to parse and merge sendmail syslog."
@@ -18,5 +18,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
   spec.add_runtime_dependency("lru_redux", [">= 0.8.4"])
   spec.add_development_dependency "bundler", "~> 1.3"
+  spec.add_development_dependency 'test-unit'
+  spec.add_runtime_dependency "fluentd"
   spec.add_development_dependency "rake"
 end

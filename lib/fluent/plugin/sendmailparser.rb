@@ -3,12 +3,51 @@ class SendmailParser
     @base_regexp = /^(?<time>\w+\s+\w+\s+\d+:\d+:\d+) (?<host>[^ ]+) (?<procowner>[^\[]+)\[(?<procid>\d+)\]: (?<qid>[^ ]+): (?<entry>(?<type>[^=]+).+)$/;
   end
 
-  def to_parser(entry)
-    # An email will be queued if it is not sent or bounced.
-    if not entry.include?("stat=Sent") and not entry.include?("dsn=5.")
-      return :queued, nil
+  def parse(value)
+    m = @base_regexp.match(value)
+    unless m
+      # $log.warn "sendmail: pattern not match: #{value.inspect}"
+      return nil
     end
+
+    logtype = m["type"]
+    entry = m["entry"]
+    mta = m["host"]
+    qid = m["qid"]
+    time = Time.parse(m["time"]).to_i || Fluent::Engine.now.to_i
+
+    logline = {
+      "type" => :from,
+      "mta" => mta,
+      "qid" => qid,
+      "time" => time,
+      "type" => nil,
+      "noncommon" => nil
+    }
+
+    case logtype
+    when "from"
+      fromline = self.from_parser(entry)
+      logline["type"] = :from
+      logline["noncommon"] = fromline
+    when "to"
+      toline = self.to_parser(entry)
+      logline["type"] = :to
+      logline["noncommon"] = toline
+    else
+      # not match
+      logline =  nil
+    end
+
+    logline
+  end
+
+  def to_line(entry)
     record = {}
+    status = nil
+
+    status = status_parser(entry)
+
     entry.split(", ").each {|param|
       key, val = param.split("=")
       record[key] = val
@@ -18,11 +57,12 @@ class SendmailParser
     if record.has_key?("relay")
       record["relay"] = relay_parser(record["relay"])
     end
-    return :sent, record
+    ToLine.new(status, record)
   end
 
-  def from_parser(entry)
+  def from_line(entry)
     record = {}
+
     entry.split(", ").each {|param|
       key, val = param.split("=")
       record[key] = val
@@ -30,12 +70,17 @@ class SendmailParser
     if record.has_key?("relay")
       record["relay"] = relay_parser(record["relay"])
     end
-    return :from, record
+    FromLine.new(record)
   end
 
-  def trim_bracket(val)
-    val[1..-2]
+  def to_parser(entry)
+    to_line(entry)
   end
+
+  def from_parser(entry)
+    from_line(entry)
+  end
+
   def relay_parser(relays)
     relay_host = nil
     relay_ip   = nil
@@ -49,35 +94,35 @@ class SendmailParser
     return {"ip" => relay_ip, "host" => relay_host}
   end
 
-  def parse(value)
-    m = @base_regexp.match(value)
-    unless m
-      # $log.warn "sendmail: pattern not match: #{value.inspect}"
-      return nil, nil, nil, nil, nil
-    end
+  def trim_bracket(val)
+    val[1..-2]
+  end
 
-    type = nil
-    # $log.info("milter!!!!", m["milter"])
-    logtype = m["type"]
-    entry = m["entry"]
-    mta = m["host"]
-
-    case logtype
-    when "from"
-      type, record = from_parser(entry)
-    when "to"
-      type, record = to_parser(entry)
-      if type == :queued
-        return nil, nil, nil, nil, nil
-      end
+  def status_parser(entry)
+    if entry.include?("stat=Sent")
+      return :sent
+    elsif entry.include?("dsn=5.")
+      return :bounced
+    elsif entry.include?("stat=Deferred")
+      return :deferred
     else
-      # not match
-      return nil, nil, nil, nil, nil
+      return :other
     end
+  end
+end
 
-    qid = m["qid"]
-    time = Time.parse(m["time"]).to_i || Fluent::Engine.now.to_i
+class FromLine
+  attr_reader :record
+  def initialize(record)
+    @record = record
+  end
+end
 
-    return mta, qid, type, time, record
+class ToLine
+  attr_reader :status
+  attr_reader :record
+  def initialize(status, record)
+    @status = status
+    @record = record
   end
 end
