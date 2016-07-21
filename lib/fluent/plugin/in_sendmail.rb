@@ -10,6 +10,8 @@ class Fluent::SendmailInput < Fluent::TailInput
 
   config_param :types, :string, :default => 'from,sent'
   config_param :unbundle, :string, :default => 'no'
+  # sendmail default value of queuereturn is 5d (432000sec)
+  config_param :queuereturn, :time, :default => 432000
 
   def initialize
     super
@@ -51,7 +53,11 @@ class Fluent::SendmailInput < Fluent::TailInput
           # new log
           from = noncommon
           record = from.record
-          @delivers[deliveryid] = SendmailLog.new(mta, time, record)
+          if @delivers.has_key?(deliveryid)
+            $log.warn "duplicate sender line found. " + line.dump
+          else
+            @delivers[deliveryid] = SendmailLog.new(mta, time, record)
+          end
         when :to
           to = noncommon
           status = to.status
@@ -61,23 +67,9 @@ class Fluent::SendmailInput < Fluent::TailInput
             status = to.status
             case status
             when :sent, :sent_local, :bounced
-              @delivers[deliveryid].dequeued(time, record)
-              if @do_unbundle
-                log_single(es, deliveryid, time, record)
-              end
-              # bulked queue in an attempt have been dequeued completely.
-              if @delivers[deliveryid].status == :all_dequeued
-                # bundled logs are outputed here
-                if not @do_unbundle
-                  log_bundled(es, deliveryid, time)
-                end
-                # log.destroy
-                @delivers.delete(qid)
-              end
+              sent(es, deliveryid, time, record)
             when :deferred
-              if @do_unbundle
-                log_single(es, deliveryid, time, record)
-              end
+              queued(es, deliveryid, time, record)
             when :other
               $log.warn "cannot find this kind of delivery status: " + line.dump
             end
@@ -87,7 +79,7 @@ class Fluent::SendmailInput < Fluent::TailInput
         end
       rescue
         $log.warn line.dump, :error=>$!.to_s
-        $log.debug_backtrace
+        raise
       end
     }
 
@@ -96,8 +88,47 @@ class Fluent::SendmailInput < Fluent::TailInput
         Fluent::Engine.emit_stream(@tag, es)
       rescue
         # ignore errors. Engine shows logs and backtraces.
+        raise
       end
     end
+  end
+
+  def sent(es, deliveryid, time, record)
+    @delivers[deliveryid].done(time, record)
+    if @do_unbundle
+      log_single(es, deliveryid, time, record)
+    end
+    # bulked queue in an attempt have been dequeued completely.
+    if @delivers[deliveryid].status == :all_done
+      # bundled logs are outputed here
+      if not @do_unbundle
+        log_bundled(es, deliveryid, time)
+      end
+      # log.destroy
+      @delivers.delete(deliveryid)
+    end
+  end
+
+  def queued(es, deliveryid, time, record)
+    # when a queue is expired, the mail will be bounced
+    delay = delay2sec(record["delay"])
+    if delay >= queuereturn
+    # if false
+      record["canonical_status"] = 'bounced'
+      sent(es, deliveryid, time, record)
+      return
+    end
+    if @do_unbundle
+      log_single(es, deliveryid, time, record)
+    end
+  end
+
+  def delay2sec(delay_str)
+    /((?<day>[0-9]*)\+)?(?<hms>[0-9]{2,2}:[0-9]{2,2}:[0-9]{2,2})/ =~ delay_str
+    day = day.to_i
+    dtime = Time.parse(hms)
+    delay = (day * 60 * 60 * 60) + (dtime.hour * 60 * 60) + (dtime.min * 60) + (dtime.sec)
+
   end
 
   def log_single(es, deliveryid, time, record)
@@ -149,11 +180,11 @@ class SendmailLog
     return records_unbundled
   end
 
-  def dequeued(time, record)
+  def done(time, record)
     @count = @count - record["to"].size
     @tos.push(record)
     if @count == 0
-      @status = :all_dequeued
+      @status = :all_done
     end
   end
 end

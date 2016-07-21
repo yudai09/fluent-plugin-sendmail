@@ -4,12 +4,12 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name          = "fluent-plugin-sendmail"
-  spec.version       = "0.1.0"
-  spec.authors       = ["muddydixon"]
-  spec.email         = ["muddydixon@gmail.com"]
+  spec.version       = "0.1.1"
+  spec.authors       = ["yudai09"]
+  spec.email         = ["grandeur09@gmail.com"]
   spec.summary       = "Fluentd plugin to parse and merge sendmail syslog."
   spec.description   = spec.summary
-  spec.homepage      = "https://github.com/muddydixon/fluent-plugin-sendmail"
+  spec.homepage      = "https://github.com/yudai09/fluent-plugin-sendmail"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files`.split($/)

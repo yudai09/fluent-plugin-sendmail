@@ -13,12 +13,14 @@ class SendmailInputTest < Test::Unit::TestCase
     path #{TMP_DIR}/sendmaillog
     tag sendmail
     unbundle yes
+    queuereturn 1d
   ]
 
   CONFIG_BUNDLE = %[
     path #{TMP_DIR}/sendmaillog
     tag sendmail
     unbundle no
+    queuereturn 1d
   ]
 
   def setup
@@ -47,7 +49,7 @@ class SendmailInputTest < Test::Unit::TestCase
   def test_unbundled
     data_file = "#{DATA_DIR}/data1"
     expect_file = "#{DATA_DIR}/data1_unbundle_result_expect"
-    driver = create_driver
+    driver = create_driver(conf=CONFIG_UNBUNDLE)
     do_test(driver, data_file, expect_file)
   end
 
@@ -86,6 +88,7 @@ class SendmailInputTest < Test::Unit::TestCase
     end
 
     emits = driver.emits
+    assert(emits.length > 0, "no emits")
     emits.each_index {|i|
       assert_equal(expects[i], emits[i][2])
     }
