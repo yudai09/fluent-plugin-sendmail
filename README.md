@@ -1,6 +1,6 @@
 # Fluent::Plugin::Sendmail
 
-Fluentd plugin to parse and merge sendmail syslog.
+Fluentd plugin to merge sender line and receiver line into one json data.
 
 ## Configuration
 
@@ -29,68 +29,6 @@ Apr  2 00:15:25 mta001 sendmail[32302]: u31FFPtp032300: done; delay=00:00:00, nt
 This plugin emit record like below:
 
 ```
-2014-01-10 01:00:01 +0900 sendmail: {
-   "mta":"mta001",
-   "from":"<grandeur09@gmail.com>",
-   "relay":{
-      "ip":"64.233.187.27",
-      "host":null
-   },
-   "count":"5",
-   "size":"5938",
-   "msgid":"<201604011515.u31FFIAj012911@gmail.com>",
-   "popid":null,
-   "authid":null,
-   "to":[
-      {
-         "to":[
-            "<sent1@example.com>",
-            "<sent2@example.com>"
-         ],
-         "00:00:00":null,
-         "xdelay":"00:00:00",
-         "mailer":"esmtp",
-         "pri":"245938",
-         "relay":{
-            "ip":"93.184.216.34",
-            "host":null
-         },
-         "dsn":"2.0.0",
-         "stat":"Sent (ok:  Message 40279894 accepted)"
-      },
-      {
-         "to":[
-            "<sent3@example2.com>",
-            "<sent4@example2.com>"
-         ],
-         "delay":"00:00:00",
-         "xdelay":"00:00:00",
-         "mailer":"esmtp",
-         "pri":"245938",
-         "relay":{
-            "ip":"93.184.216.34",
-            "host":null
-         },
-         "dsn":"2.0.0",
-         "stat":"Sent (ok:  Message 40279895 accepted)"
-      },
-      {
-         "to":[
-            "<deferred1@example.com>"
-         ],
-         "delay":"00:00:00",
-         "xdelay":"00:00:00",
-         "mailer":"esmtp",
-         "pri":"245938",
-         "relay":{
-            "ip":"93.184.216.34",
-            "host":null
-         },
-         "dsn":"2.0.0",
-         "stat":"Sent (ok:  Message 40279894 accepted)"
-      }
-   ]
-}
 ```
 
 ### unbundle
@@ -110,124 +48,37 @@ unbundle mode
 This plugin emit record like below:
 
 ```
-2014-01-10 01:00:01 +0900 sendmail: {
-   "mta":"mta001",
-   "from":"<grandeur09@gmail.com>",
-   "relay":{
-      "ip":"93.184.216.34",
-      "host":null
-   },
-   "count":"5",
-   "size":"5938",
-   "msgid":"<201604011515.u31FFIAj012911@gmail.com>",
-   "popid":null,
-   "authid":null,
-   "to":"<sent1@example.com>",
-   "stat":"Sent (ok:  Message 40279894 accepted)",
-   "dsn":"2.0.0",
-   "delay":null,
-   "xdelay":"00:00:00"
+2014-01-10 01:00:01 +0900 sendmail:
+{
+    "time":1459523725,
+    "mta":"mta001",
+    "qid":"u31FFPtp032300",
+    "from":"<grandeur09@gmail.com>",
+    "size":"5938",
+    "class":"0",
+    "nrcpts":"7",
+    "msgid":"<201604011515.u31FFIAj012911@gmail.com>",
+    "proto":"ESMTP",
+    "daemon":"MTA",
+    "relay":{
+        "ip":"93.184.216.34",
+        "host":null
+    },
+    "status_canonical":"sent",
+    "to":[
+        "<sent1@example.com>",
+        "<sent2@example.com>"
+    ],
+    "delay":"00:00:00",
+    "xdelay":"00:00:00",
+    "mailer":"esmtp",
+    "pri":"245938",
+    "dsn":"2.0.0",
+    "stat":"Sent (ok: Message 40279894 accepted)",
+    "delay_in_sec":0
 }
-
-2014-01-10 01:00:01 +0900 sendmail: {
-   "mta":"mta001",
-   "from":"<grandeur09@gmail.com>",
-   "relay":{
-      "ip":"93.184.216.34",
-      "host":null
-   },
-   "count":"5",
-   "size":"5938",
-   "msgid":"<201604011515.u31FFIAj012911@gmail.com>",
-   "popid":null,
-   "authid":null,
-   "to":"<sent2@example.com>",
-   "stat":"Sent (ok:  Message 40279894 accepted)",
-   "dsn":"2.0.0",
-   "delay":null,
-   "xdelay":"00:00:00"
-}
-
-2014-01-10 01:00:01 +0900 sendmail: {
-   "mta":"mta001",
-   "from":"<grandeur09@gmail.com>",
-   "relay":{
-      "ip":"93.184.216.34",
-      "host":null
-   },
-   "count":"5",
-   "size":"5938",
-   "msgid":"<201604011515.u31FFIAj012911@gmail.com>",
-   "popid":null,
-   "authid":null,
-   "to":"<deferred1@example.com>",
-   "stat":"Deferred: 451 4.3.5 Server configuration problem",
-   "dsn":"4.3.5",
-   "delay":"00:00:15",
-   "xdelay":"00:00:15"
-}
-
-2014-01-10 01:00:01 +0900 sendmail: {
-   "mta":"mta001",
-   "from":"<grandeur09@gmail.com>",
-   "relay":{
-      "ip":"93.184.216.34",
-      "host":null
-   },
-   "count":"5",
-   "size":"5938",
-   "msgid":"<201604011515.u31FFIAj012911@gmail.com>",
-   "popid":null,
-   "authid":null,
-   "to":"<sent3@example2.com>",
-   "stat":"Sent (ok:  Message 40279895 accepted)",
-   "dsn":"2.0.0",
-   "delay":"00:00:00",
-   "xdelay":"00:00:00"
-}
-
-2014-01-10 01:00:01 +0900 sendmail: {
-   "mta":"mta001",
-   "from":"<grandeur09@gmail.com>",
-   "relay":{
-      "ip":"93.184.216.34",
-      "host":null
-   },
-   "count":"5",
-   "size":"5938",
-   "msgid":"<201604011515.u31FFIAj012911@gmail.com>",
-   "popid":null,
-   "authid":null,
-   "to":"<sent4@example2.com>",
-   "stat":"Sent (ok:  Message 40279895 accepted)",
-   "dsn":"2.0.0",
-   "delay":"00:00:00",
-   "xdelay":"00:00:00"
-}
-
-2014-01-10 01:00:01 +0900 sendmail: {
-   "mta":"mta001",
-   "from":"<grandeur09@gmail.com>",
-   "relay":{
-      "ip":"93.184.216.34",
-      "host":null
-   },
-   "count":"5",
-   "size":"5938",
-   "msgid":"<201604011515.u31FFIAj012911@gmail.com>",
-   "popid":null,
-   "authid":null,
-   "to":"<deferred1@example.com>",
-   "stat":"Sent (ok:  Message 40279894 accepted)",
-   "dsn":"2.0.0",
-   "delay":"00:00:00",
-   "xdelay":"00:00:00"
-}
-```
 
 ## TODO
-
-tracking bounce.
 
 ## ChangeLog
 
