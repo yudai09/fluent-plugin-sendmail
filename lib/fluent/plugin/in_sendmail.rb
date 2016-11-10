@@ -1,23 +1,57 @@
 # -*- coding: utf-8 -*-
 class Fluent::SendmailInput < Fluent::TailInput
-  require_relative "sendmailparser"
-  require "pathname"
-  require "lru_redux"
-
-  config_param :lrucache_size, :integer, :default => (1024*1024)
-
   Fluent::Plugin.register_input("sendmail", self)
 
+  config_param :lrucache_size, :integer, :default => (1024*1024)
   # sendmail default value of queuereturn is 5d (432000sec)
   config_param :queuereturn, :time, :default => 432000
+  config_param :path_cache_file, :string, :default => nil
 
-  def initialize
+  require_relative "sendmailparser"
+  require "lru_redux"
+
+  def configure(conf)
     super
     @delivers = LruRedux::ThreadSafeCache.new(@lrucache_size)
+    if @path_cache_file != nil
+      if not File.exists?(@path_cache_file)
+        File.open(@path_cache_file, "w+"){|cache_file|
+          cache_file.puts('{}')
+        }
+      end
+      if not File.readable?(@path_cache_file)
+        raise ConfigError, "cache file exists but not readable."
+      end
+      if not File.writable?(@path_cache_file)
+        raise Fluent::ConfigError, "cache file not writable."
+      end
+      File.open(@path_cache_file, "r") {|cache_file|
+        line = cache_file.read()
+        data = JSON.parse(line)
+        data.each{|k, v|
+          @delivers[k] = SendmailLog.new(v['time'], v['from_line'], v['nrcpts'])
+        }
+      }
+    end
   end
 
   def configure_parser(conf)
     @parser = SendmailParser.new(conf)
+  end
+
+  def shutdown
+    super
+    if @path_cache_file != nil
+      data = {}
+      if @path_cache_file != nil
+        @delivers.each{|k, v|
+          data[k] = v.to_json
+        }
+      end
+      File.open(@path_cache_file, "w+") {|cache_file|
+        cache_file.puts(data)
+      }
+    end
   end
 
   def receive_lines(lines)
@@ -110,9 +144,22 @@ class SendmailLog
   attr_reader :time
   attr_reader :from_line
   attr_accessor :nrcpts
-  def initialize(time, from_line)
+
+  def initialize(time, from_line, nrcpts=nil)
     @time = time
     @from_line = from_line
-    @nrcpts = from_line["nrcpts"].to_i
+    if nrcpts == nil
+      @nrcpts = from_line["nrcpts"].to_i
+    else
+      @nrcpts = nrcpts
+    end
+  end
+
+  def to_json()
+    return {
+      "time" => @time,
+      "from_line" => @from_line,
+      "nrcpts" => @nrcpts,
+    }
   end
 end

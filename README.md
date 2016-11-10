@@ -80,6 +80,8 @@ This plugin emit record like below:
 
 ## TODO
 
+write test for path_cache_file parmeter
+
 ## ChangeLog
 
 See [CHANGELOG.md](CHANGELOG.md) for details.

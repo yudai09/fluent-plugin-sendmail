@@ -14,6 +14,7 @@ class SendmailInputTest < Test::Unit::TestCase
     path #{TMP_DIR}/sendmaillog
     tag sendmail
     queuereturn 1d
+    path_cache_file /tmp/fluent_plugin_sendmail_test_cache_file
   ]
 
   def setup
