@@ -4,23 +4,17 @@ require 'json'
 class SendmailInputTest < Test::Unit::TestCase
   def setup
     Fluent::Test.setup
+    log = Fluent::Engine.log
   end
 
   TMP_DIR = File.dirname(__FILE__) + "/../tmp"
   DATA_DIR = File.dirname(__FILE__) + "/../data"
 
-  CONFIG_UNBUNDLE = %[
+  CONFIG = %[
     path #{TMP_DIR}/sendmaillog
     tag sendmail
-    unbundle yes
     queuereturn 1d
-  ]
-
-  CONFIG_BUNDLE = %[
-    path #{TMP_DIR}/sendmaillog
-    tag sendmail
-    unbundle no
-    queuereturn 1d
+    path_cache_file /tmp/fluent_plugin_sendmail_test_cache_file
   ]
 
   def setup
@@ -29,34 +23,19 @@ class SendmailInputTest < Test::Unit::TestCase
     FileUtils.mkdir_p(TMP_DIR)
   end
 
-  def create_driver(conf = CONFIG_UNBUNDLE, tag='test')
+  def create_driver(conf = CONFIG, tag='test')
     driver = Fluent::Test::InputTestDriver.new(Fluent::SendmailInput)
     driver.configure(conf)
     driver
   end
 
   def test_configure
-    #### set configurations
-    # d = create_driver %[
-    #   path test_path
-    #   compress gz
-    # ]
-    #### check configurations
-    # assert_equal 'test_path', d.instance.path
-    # assert_equal :gz, d.instance.compress
   end
 
-  def test_unbundled
-    data_file = "#{DATA_DIR}/data1"
-    expect_file = "#{DATA_DIR}/data1_unbundle_result_expect"
-    driver = create_driver(conf=CONFIG_UNBUNDLE)
-    do_test(driver, data_file, expect_file)
-  end
-
-  def test_bundled
-    data_file = "#{DATA_DIR}/data1"
-    expect_file = "#{DATA_DIR}/data1_bundle_result_expect"
-    driver = create_driver(conf=CONFIG_BUNDLE)
+  def test
+    data_file = "#{DATA_DIR}/data"
+    expect_file = "#{DATA_DIR}/result"
+    driver = create_driver(conf=CONFIG)
     do_test(driver, data_file, expect_file)
   end
 
@@ -66,9 +45,9 @@ class SendmailInputTest < Test::Unit::TestCase
 
     # touch tail file
     File.open(path, "a") {}
-
     # result_expect
     expects = []
+
     File.open(expect_file, "r") {|expectfile|
       expectfile.each_line {|line|
         expects.push(JSON.parse(line))
@@ -89,8 +68,10 @@ class SendmailInputTest < Test::Unit::TestCase
 
     emits = driver.emits
     assert(emits.length > 0, "no emits")
+
     emits.each_index {|i|
       assert_equal(expects[i], emits[i][2])
     }
+
   end
 end

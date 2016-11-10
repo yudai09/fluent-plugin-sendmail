@@ -1,6 +1,6 @@
 class SendmailParser
   def initialize(conf)
-    @base_regexp = /^(?<time>\w+\s+\w+\s+\d+:\d+:\d+) (?<host>[^ ]+) (?<procowner>[^\[]+)\[(?<procid>\d+)\]: (?<qid>[^ ]+): (?<entry>(?<type>[^=]+).+)$/;
+    @base_regexp = /^(?<time>\w+\s+\w+\s+\d+:\d+:\d+) (?<mta>[^ ]+) (?<procowner>[^\[]+)\[(?<procid>\d+)\]: (?<qid>[^ ]+): (?<entry>(?<type>[^=]+).+)$/;
   end
 
   def parse(value)
@@ -9,60 +9,44 @@ class SendmailParser
       # $log.warn "sendmail: pattern not match: #{value.inspect}"
       return nil
     end
-
-    logtype = m["type"]
-    entry = m["entry"]
-    mta = m["host"]
-    qid = m["qid"]
     time = Time.parse(m["time"]).to_i || Fluent::Engine.now.to_i
-
-    logline = {
-      "type" => :from,
-      "mta" => mta,
-      "qid" => qid,
+    record = {
       "time" => time,
-      "type" => nil,
-      "noncommon" => nil
+      "mta" => m["mta"],
+      "qid" => m["qid"],
+      "type" => m["type"],
     }
-
-    case logtype
+    case m["type"]
     when "from"
-      fromline = self.from_parser(entry)
-      logline["type"] = :from
-      logline["noncommon"] = fromline
+      fromline = self.from_line(m["entry"])
+      record.merge!(fromline)
     when "to"
-      toline = self.to_parser(entry)
-      logline["type"] = :to
-      logline["noncommon"] = toline
-    else
-      # not match
-      logline =  nil
+      toline = self.to_line(m["entry"])
+      record.merge!(toline)
+    else # not match
+      m =  nil
     end
-
-    logline
+    record
   end
 
   def to_line(entry)
     record = {}
     status = nil
-
-    status = status_parser(entry)
-
+    record["status_canonical"] = status_parser(entry)
     entry.split(", ").each {|param|
       key, val = param.split("=")
       record[key] = val
     }
     record["to"] = record["to"].split(",")
-
     if record.has_key?("relay")
       record["relay"] = relay_parser(record["relay"])
     end
-    ToLine.new(status, record)
+    record["delay_in_sec"] = delay_parser(record["delay"])
+    return record
   end
 
   def from_line(entry)
     record = {}
-
     entry.split(", ").each {|param|
       key, val = param.split("=")
       record[key] = val
@@ -70,15 +54,7 @@ class SendmailParser
     if record.has_key?("relay")
       record["relay"] = relay_parser(record["relay"])
     end
-    FromLine.new(record)
-  end
-
-  def to_parser(entry)
-    to_line(entry)
-  end
-
-  def from_parser(entry)
-    from_line(entry)
+    return record
   end
 
   def relay_parser(relays)
@@ -94,40 +70,30 @@ class SendmailParser
     return {"ip" => relay_ip, "host" => relay_host}
   end
 
-  def trim_bracket(val)
-    val[1..-2]
-  end
-
   def status_parser(entry)
     if entry.include?("stat=Sent")
       if entry.include?("mailer=local,")
-        return :sent_local
+        return "sent_local"
       else
-        return :sent
+        return "sent"
       end
     elsif entry.include?("dsn=5.")
-      return :bounced
+      return "bounced"
     elsif entry.include?("stat=Deferred")
-      return :deferred
+      return "deferred"
     else
-      return :other
+      return "other"
     end
   end
-end
 
-class FromLine
-  attr_reader :record
-  def initialize(record)
-    @record = record
+  def delay_parser(delay)
+    /((?<day>[0-9]*)\+)?(?<hms>[0-9]{2,2}:[0-9]{2,2}:[0-9]{2,2})/ =~ delay
+    day = day.to_i
+    dtime = Time.parse(hms)
+    delay = (day * 24 * 60 * 60) + (dtime.hour * 60 * 60) + (dtime.min * 60) + (dtime.sec)
   end
-end
 
-class ToLine
-  attr_reader :status
-  attr_reader :record
-  def initialize(status, record)
-    @status = status
-    @record = record
-    @record["canonical_status"] = status.to_s
+  def trim_bracket(val)
+    val[1..-2]
   end
 end

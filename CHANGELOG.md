@@ -7,5 +7,10 @@ First version
 added unit test
 added unbundle mode
 
+## 0.1.1
+
+remove bundle mode
+flatten json data
+add cache persistance
 
 
