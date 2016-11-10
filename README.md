@@ -7,9 +7,10 @@ Fluentd plugin to merge sender line and receiver line into one json data.
 ```
 <source>
   type sendmail
-  path ./syslog.log
-  pos_file ./syslog.log.pos
+  path /var/log/maillog
   tag sendmail
+  queuereturn 60m
+  path_cache_file /tmp/test.dat
 </source>
 ```
 
@@ -24,25 +25,6 @@ Apr  2 00:15:25 mta001 sendmail[12566]: u31FFPtp032300: to=<deferred1@example.co
 Apr  2 00:15:26 mta001 sendmail[32302]: u31FFPtp032300: to=<sent3@example2.com>,<sent4@example2.com>, delay=00:00:00, xdelay=00:00:00, mailer=esmtp, pri=245938, relay=[93.184.216.34] [93.184.216.34], dsn=2.0.0, stat=Sent (ok:  Message 40279895 accepted)
 Apr  2 00:18:50 mta001 sendmail[32302]: u31FFPtp032300: to=<deferred1@example.com>, delay=00:00:00, xdelay=00:00:00, mailer=esmtp, pri=245938, relay=[93.184.216.34] [93.184.216.34], dsn=2.0.0, stat=Sent (ok:  Message 40279894 accepted)
 Apr  2 00:15:25 mta001 sendmail[32302]: u31FFPtp032300: done; delay=00:00:00, ntries=2
-```
-
-This plugin emit record like below:
-
-```
-```
-
-### unbundle
-
-unbundle mode
-
-```
-<source>
-  type sendmail
-  path ./syslog.log
-  pos_file ./syslog.log.pos
-  tag sendmail
-  unbundle yes
-</source>
 ```
 
 This plugin emit record like below:
@@ -77,6 +59,7 @@ This plugin emit record like below:
     "stat":"Sent (ok: Message 40279894 accepted)",
     "delay_in_sec":0
 }
+```
 
 ## TODO
 
