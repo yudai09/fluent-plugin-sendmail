@@ -9,6 +9,7 @@ class Fluent::SendmailInput < Fluent::TailInput
 
   require_relative "sendmailparser"
   require "lru_redux"
+  require "json"
 
   def configure(conf)
     super
@@ -43,13 +44,11 @@ class Fluent::SendmailInput < Fluent::TailInput
     super
     if @path_cache_file != nil
       data = {}
-      if @path_cache_file != nil
-        @delivers.each{|k, v|
-          data[k] = v.to_json
-        }
-      end
+      @delivers.each{|k, v|
+        data[k] = v.to_json
+      }
       File.open(@path_cache_file, "w+") {|cache_file|
-        cache_file.puts(data)
+        cache_file.puts(data.to_json)
       }
     end
   end
