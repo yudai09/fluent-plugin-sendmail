@@ -39,7 +39,8 @@ class SendmailParser
     }
     record["to"] = record["to"].split(",")
     if record.has_key?("relay")
-      record["relay"] = relay_parser(record["relay"])
+      record["relay_to"] = relay_parser(record["relay"])
+      record.delete("relay")
     end
     record["delay_in_sec"] = delay_parser(record["delay"])
     return record
@@ -52,7 +53,8 @@ class SendmailParser
       record[key] = val
     }
     if record.has_key?("relay")
-      record["relay"] = relay_parser(record["relay"])
+      record["relay_from"] = relay_parser(record["relay"])
+      record.delete("relay")
     end
     return record
   end
